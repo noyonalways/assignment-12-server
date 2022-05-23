@@ -17,19 +17,27 @@ app.use(express());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.hjons.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
-async function run(){
-    try{
+async function run() {
+    try {
         await client.connect();
         const bannerSlideCollection = client.db('techParts').collection('bannerSlideCollection');
+        const questionCollection = client.db('techParts').collection('questionCollection');
 
-        app.get('/home-slider', async(req,res) => {
+        // get the home banner silder data
+        app.get('/home-slider', async (req, res) => {
             const homeSliders = await bannerSlideCollection.find().toArray();
-            res.send({success: true, data: homeSliders});
+            res.send({ success: true, data: homeSliders });
+        });
+
+        // get all questions and answers
+        app.get('/question', async (req, res) => {
+            const questions = await questionCollection.find().toArray();
+            res.send({ success: true, data: questions });
         })
 
     }
-    finally{
-
+    finally {
+        // await client.close();
     }
 }
 
