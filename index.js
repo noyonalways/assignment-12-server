@@ -25,6 +25,13 @@ async function run() {
         const reviewCollection = client.db('techParts').collection('reviewCollection');
         const productCollection = client.db('techParts').collection('productCollection');
         const orderCollection = client.db('techParts').collection('orderCollection');
+        const portfolioCollection = client.db('techParts').collection('portfolioCollection');
+
+        // get portfolio information
+        app.get('/portfolio', async(req, res) => {
+            const portfolio = await portfolioCollection.find().toArray();
+            res.send(portfolio);
+        })
 
         // get the home banner silder data
         app.get('/home-slider', async (req, res) => {
