@@ -68,6 +68,14 @@ async function run() {
             res.send({ success: true, data: reviews });
         });
 
+        // add new review
+        app.post('/review', async(req, res) => {
+            const newReview = req.body;
+            const result = await reviewCollection.insertOne(newReview);
+            res.send({success: true, data: result}); 
+        });
+        
+
         // jwt to token sent to ther client side and store use to the database
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
@@ -130,6 +138,14 @@ async function run() {
             const product = await productCollection.findOne(query);
             res.send(product);
         });
+
+        // add new prodcut
+        app.post('/product', async(req, res) => {
+            const product = req.body;
+            const result = await productCollection.insertOne(product);
+            res.send({success: true, data: result});
+        });
+
 
         // update  product 
         app.put('/product/:id', async (req, res) => {
