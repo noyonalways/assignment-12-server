@@ -14,13 +14,13 @@ app.use(express.json());
 
 const verifyJWT = (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if(!authHeader){
-        return res.status(401).send({message: 'Authorized user'});
+    if (!authHeader) {
+        return res.status(401).send({ message: 'Unauthorized user' });
     }
     const token = authHeader.split(' ')[1];
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if(err){
-            return res.status(403).send({message: 'Forbidden'})
+        if (err) {
+            return res.status(403).send({ message: 'Forbidden' })
         }
         req.decoded = decoded;
         next();
@@ -45,7 +45,7 @@ async function run() {
         const userCollection = client.db('techParts').collection('userCollection');
 
         // get portfolio information
-        app.get('/portfolio', async(req, res) => {
+        app.get('/portfolio', async (req, res) => {
             const portfolio = await portfolioCollection.find().toArray();
             res.send(portfolio);
         })
@@ -63,29 +63,64 @@ async function run() {
         });
 
         // get all reviews
-        app.get('/review', async(req, res) => {
+        app.get('/review', async (req, res) => {
             const reviews = await reviewCollection.find().toArray();
-            res.send({success: true, data: reviews});
+            res.send({ success: true, data: reviews });
         });
 
-        // jwt token sent to clien and create a user to store database
-        app.put('/user/:email', async(req, res) => {
+        // jwt to token sent to ther client side and store use to the database
+        app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
             const user = req.body;
-            const filter = {email: email};
-            const options = {upsert: true};
+            const filter = { email: email };
+            const options = { upsert: true };
             const updatedDoc = {
                 $set: user
             };
             const result = await userCollection.updateOne(filter, updatedDoc, options);
-            const token = jwt.sign({email: email}, process.env.ACCESS_TOKEN_SECRET,{ expiresIn: '1h' });
-            res.send({result, token});
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            res.send({ result, token });
         });
 
+        // make an user admin
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const filter = { email: email };
+            const requester = req.decoded.email;
+            const requesterAccout = await userCollection.findOne({ email: requester });
+            if(requesterAccout.role === 'admin'){
+                const updatedDoc = {
+                    $set: {
+                        role: "admin"
+                    }
+                };
+                const result = await userCollection.updateOne(filter, updatedDoc);
+                res.send(result)
+            }else{
+                res.status(403).send({message: 'Forbidden'})
+            }
+            
+        });
+
+        // check user admin
+        app.get('/admin/:email',verifyJWT,  async(req, res) => {
+            const email = req.params.email;
+            const user = await userCollection.findOne({email: email});
+            const isAdmin = user.role === 'admin';
+            res.send({isAdmin, message: `This is admin ${isAdmin}`});
+        })
+
+
+        // get all users
+        app.get('/user', verifyJWT, async (req, res) => {
+            const users = await userCollection.find().toArray();
+            res.send(users);
+        })
+
         // get all products
-        app.get('/product', async(req, res) => {
+        app.get('/product', verifyJWT, async (req, res) => {
             const products = await productCollection.find().toArray();
-            res.send({success: true, data: products});
+            res.send({ success: true, data: products });
         });
 
         // get single product
@@ -97,22 +132,22 @@ async function run() {
         });
 
         // update  product 
-        app.put('/product/:id', async(req, res) => {
+        app.put('/product/:id', async (req, res) => {
             const id = req.params.id;
             const requestProduct = req.body;
             const updatedQuantity = requestProduct.quantity;
             const updatedSold = requestProduct.sold;
-            const filter = {_id: ObjectId(id)};
-            const options = {upsert: true};
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
             const updatedProduct = {
                 $set: {
                     availableQuantity: updatedQuantity,
-                    sold : updatedSold
+                    sold: updatedSold
                 }
             };
-            
+
             const result = await productCollection.updateOne(filter, updatedProduct, options);
-            res.send({success: true, message: 'Updated Succesfully', result});
+            res.send({ success: true, message: 'Updated Succesfully', result });
         });
 
 
@@ -123,12 +158,28 @@ async function run() {
             res.send({ success: true, message: "Succesfully Added", result });
         });
 
-        // get user orser
-        app.get('/myOrder', async(req, res) => {
+        // get all user orders
+        app.get('/order', verifyJWT, async (req, res) => {
             const email = req.query.email;
-            const query = {email: email};
-            const orders = await orderCollection.find(query).toArray();
-            res.send(orders);
+            if (email) {
+                const orders = await orderCollection.find().toArray();
+                return res.send(orders);
+            }else{
+                return res.status(403).send({message: "Forbidden access"});
+            }
+        });
+
+        // get specific user orders
+        app.get('/myOrder', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            if (email === decodedEmail) {
+                const query = { email: email };
+                const myOrder = await orderCollection.find(query).toArray();
+                return res.send(myOrder);
+            }else{
+                return res.status(403).send({message: "Forbidden access"});
+            }
         });
 
     }
