@@ -3,8 +3,9 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+const port = process.env.PORT || 5000;
 const app = express();
 
 
@@ -42,6 +43,7 @@ async function run() {
         const reviewCollection = client.db('techParts').collection('reviewCollection');
         const productCollection = client.db('techParts').collection('productCollection');
         const orderCollection = client.db('techParts').collection('orderCollection');
+        const paymentCollection = client.db('techParts').collection('paymentCollection');
         const userCollection = client.db('techParts').collection('userCollection');
 
         // get portfolio information
@@ -69,12 +71,12 @@ async function run() {
         });
 
         // add new review
-        app.post('/review', async(req, res) => {
+        app.post('/review', async (req, res) => {
             const newReview = req.body;
             const result = await reviewCollection.insertOne(newReview);
-            res.send({success: true, data: result}); 
+            res.send({ success: true, data: result });
         });
-        
+
 
         // jwt to token sent to ther client side and store use to the database
         app.put('/user/:email', async (req, res) => {
@@ -96,7 +98,7 @@ async function run() {
             const filter = { email: email };
             const requester = req.decoded.email;
             const requesterAccout = await userCollection.findOne({ email: requester });
-            if(requesterAccout.role === 'admin'){
+            if (requesterAccout.role === 'admin') {
                 const updatedDoc = {
                     $set: {
                         role: "admin"
@@ -104,18 +106,18 @@ async function run() {
                 };
                 const result = await userCollection.updateOne(filter, updatedDoc);
                 res.send(result)
-            }else{
-                res.status(403).send({message: 'Forbidden'})
+            } else {
+                res.status(403).send({ message: 'Forbidden' })
             }
-            
+
         });
 
         // check user admin
-        app.get('/admin/:email',verifyJWT,  async(req, res) => {
+        app.get('/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
-            const user = await userCollection.findOne({email: email});
+            const user = await userCollection.findOne({ email: email });
             const isAdmin = user.role === 'admin';
-            res.send({isAdmin, message: `This is admin ${isAdmin}`});
+            res.send({ isAdmin, message: `This is admin ${isAdmin}` });
         })
 
 
@@ -131,8 +133,17 @@ async function run() {
             res.send({ success: true, data: products });
         });
 
+        // delete product from product colleciton
+        app.delete('/product/:id', async(req, res) => {
+            const id = req.params.id;
+            const query = {_id: ObjectId(id)};
+            const result = await productCollection.deleteOne(query);
+            console.log(id);
+            res.send({success: true, message: "Deleted Succesfully", result});
+        })
+
         // get single product
-        app.get('/product/:id', async (req, res) => {
+        app.get('/product/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
             const product = await productCollection.findOne(query);
@@ -140,10 +151,10 @@ async function run() {
         });
 
         // add new prodcut
-        app.post('/product', async(req, res) => {
+        app.post('/product', verifyJWT, async (req, res) => {
             const product = req.body;
             const result = await productCollection.insertOne(product);
-            res.send({success: true, data: result});
+            res.send({ success: true, data: result });
         });
 
 
@@ -167,8 +178,8 @@ async function run() {
         });
 
 
-        //  new order
-        app.post('/order', async (req, res) => {
+        //  new order add
+        app.post('/order', verifyJWT, async (req, res) => {
             const newProduct = req.body
             const result = await orderCollection.insertOne(newProduct);
             res.send({ success: true, message: "Succesfully Added", result });
@@ -180,8 +191,8 @@ async function run() {
             if (email) {
                 const orders = await orderCollection.find().toArray();
                 return res.send(orders);
-            }else{
-                return res.status(403).send({message: "Forbidden access"});
+            } else {
+                return res.status(403).send({ message: "Forbidden access" });
             }
         });
 
@@ -193,10 +204,75 @@ async function run() {
                 const query = { email: email };
                 const myOrder = await orderCollection.find(query).toArray();
                 return res.send(myOrder);
-            }else{
-                return res.status(403).send({message: "Forbidden access"});
+            } else {
+                return res.status(403).send({ message: "Forbidden access" });
             }
         });
+
+        // get single order from order collection
+        app.get('/myOrder/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const order = await orderCollection.findOne(query);
+            res.send(order);
+        });
+
+        //  add transation id
+        app.patch('/order/:id',verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    status: 'pending',
+                    paid: true,
+                    transactionId: payment.transactionId,
+                }
+            }
+            const result = await paymentCollection.insertOne(payment);
+            const updatedOrder = await orderCollection.updateOne(filter, updatedDoc);
+            res.send(updatedDoc);
+
+        });
+
+        // delete order
+        app.delete('/order/:id', async(req, res) => {
+            const id = req.params.id;
+            const query = {_id: ObjectId(id)};
+            const result = await orderCollection.deleteOne(query);
+            res.send({success: true, message: "Deleted Succesfully", result});
+        });
+
+        // products get status
+        app.put('/status/:id', async(req, res) => {
+            const id = req.params.id;
+            const filter = {_id: ObjectId(id)}
+            const updatedDoc = {
+                $set: {
+                    status: 'shipped',
+                }
+            }
+            const result = await orderCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
+
+
+        // make payment
+        app.post('/create-payment-intent',  async (req, res) => {
+            const product = req.body;
+            const price = product.price;
+            // console.log(price);
+            const amout = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amout,
+                currency: "usd",
+                payment_method_types: ['card']
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+
 
     }
     finally {
