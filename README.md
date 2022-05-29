@@ -5,7 +5,7 @@
 ### https://tech-parts.web.app/
 
 ## Tech-parts live server link
-### http://localhost:5000/
+### https://glacial-temple-86041.herokuapp.com/
 
 ## Website Features
 - Dynamic website
