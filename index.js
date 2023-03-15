@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const colors = require('colors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -37,6 +38,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try {
         await client.connect();
+        console.log(`Database Connected Successfully! ✔`.cyan.bold);
         const portfolioCollection = client.db('techParts').collection('portfolioCollection');
         const bannerSlideCollection = client.db('techParts').collection('bannerSlideCollection');
         const questionCollection = client.db('techParts').collection('questionCollection');
@@ -288,5 +290,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log('Listening to port', port);
+    console.log(`App is runnng on ${port}`.yellow.bold, `http://localhost:${port}`);
 })
